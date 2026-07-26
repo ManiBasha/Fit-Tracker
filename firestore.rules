@@ -9,5 +9,9 @@ service cloud.firestore {
     match /users/{uid}/checklist/{dateId} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
+    match /users/{uid}/metrics/{dateId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }
