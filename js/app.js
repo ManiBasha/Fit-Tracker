@@ -8,71 +8,46 @@ import { firebaseConfig, isConfigured } from './firebase-config.js';
 
 let store;
 const statusEl = () => document.getElementById('syncStatus');
+const loginScreen = () => document.getElementById('loginScreen');
+const appBody = () => document.getElementById('appBody');
+const userBadgeRow = () => document.getElementById('userBadgeRow');
 
-async function initStore() {
-  if (isConfigured) {
-    try {
-      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
-      const { getFirestore, doc, getDoc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-      const { getAuth, signInAnonymously, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
-
-      const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
-      const auth = getAuth(app);
-
-      const uid = await new Promise((resolve, reject) => {
-        onAuthStateChanged(auth, (user) => {
-          if (user) resolve(user.uid);
-        });
-        signInAnonymously(auth).catch(reject);
-      });
-
-      statusEl().textContent = 'synced — firestore';
-      statusEl().className = 'sync-status ok';
-
-      store = {
-        backend: 'firestore',
-        async getPlan() {
-          const snap = await getDoc(doc(db, 'users', uid, 'data', 'plan'));
-          return snap.exists() ? snap.data() : null;
-        },
-        async savePlan(plan) {
-          await setDoc(doc(db, 'users', uid, 'data', 'plan'), plan);
-        },
-        async getChecklist(dateStr) {
-          const snap = await getDoc(doc(db, 'users', uid, 'checklist', dateStr));
-          return snap.exists() ? snap.data().items : null;
-        },
-        async saveChecklist(dateStr, items) {
-          await setDoc(doc(db, 'users', uid, 'checklist', dateStr), { items });
-        },
-        async getProgress() {
-          const snap = await getDoc(doc(db, 'users', uid, 'data', 'progress'));
-          return snap.exists() ? snap.data().entries : [];
-        },
-        async saveProgress(entries) {
-          await setDoc(doc(db, 'users', uid, 'data', 'progress'), { entries });
-        }
-      };
-      return;
-    } catch (err) {
-      console.error('Firebase init failed, falling back to localStorage:', err);
+function buildFirestoreStore(db, docFns, uid) {
+  const { doc, getDoc, setDoc } = docFns;
+  return {
+    backend: 'firestore',
+    async getPlan() {
+      const snap = await getDoc(doc(db, 'users', uid, 'data', 'plan'));
+      return snap.exists() ? snap.data() : null;
+    },
+    async savePlan(plan) {
+      await setDoc(doc(db, 'users', uid, 'data', 'plan'), plan);
+    },
+    async getChecklist(dateStr) {
+      const snap = await getDoc(doc(db, 'users', uid, 'checklist', dateStr));
+      return snap.exists() ? snap.data().items : null;
+    },
+    async saveChecklist(dateStr, items) {
+      await setDoc(doc(db, 'users', uid, 'checklist', dateStr), { items });
+    },
+    async getProgress() {
+      const snap = await getDoc(doc(db, 'users', uid, 'data', 'progress'));
+      return snap.exists() ? snap.data().entries : [];
+    },
+    async saveProgress(entries) {
+      await setDoc(doc(db, 'users', uid, 'data', 'progress'), { entries });
     }
-  }
+  };
+}
 
-  // ---- localStorage fallback ----
-  statusEl().textContent = isConfigured
-    ? 'firestore unavailable — using local storage'
-    : 'no firestore config — using local storage';
-  statusEl().className = 'sync-status local';
-
+function buildLocalStore() {
   const read = (k, fallback) => {
     const v = localStorage.getItem(k);
     return v ? JSON.parse(v) : fallback;
   };
   const write = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
-  store = {
+  return {
     backend: 'local',
     async getPlan() { return read('lb_plan', null); },
     async savePlan(plan) { write('lb_plan', plan); },
@@ -81,6 +56,84 @@ async function initStore() {
     async getProgress() { return read('lb_progress', []); },
     async saveProgress(entries) { write('lb_progress', entries); }
   };
+}
+
+function useLocalFallback(reason) {
+  store = buildLocalStore();
+  statusEl().textContent = reason;
+  statusEl().className = 'sync-status local';
+  loginScreen().style.display = 'none';
+  appBody().style.display = '';
+  userBadgeRow().style.display = 'none';
+}
+
+/**
+ * Sets up Firebase Auth (Google Sign-In) + Firestore, gated by a login
+ * screen. Resolves once, the first time a signed-in user is available;
+ * further sign-in/out events after that just re-render in place.
+ */
+async function initStore() {
+  if (!isConfigured) {
+    useLocalFallback('no firestore config — using local storage');
+    return;
+  }
+
+  try {
+    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    const firestoreMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const { getFirestore, doc, getDoc, setDoc } = firestoreMod;
+    const { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } =
+      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    document.getElementById('signInBtn').addEventListener('click', async () => {
+      document.getElementById('loginError').textContent = '';
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (err) {
+        console.error('Google sign-in failed:', err);
+        document.getElementById('loginError').textContent = 'Sign-in failed — ' + err.message;
+      }
+    });
+
+    document.getElementById('signOutBtn').addEventListener('click', () => signOut(auth));
+
+    return await new Promise((resolve) => {
+      let resolved = false;
+      onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          store = buildFirestoreStore(db, { doc, getDoc, setDoc }, user.uid);
+          statusEl().textContent = 'synced — firestore (' + (user.email || 'google account') + ')';
+          statusEl().className = 'sync-status ok';
+          loginScreen().style.display = 'none';
+          appBody().style.display = '';
+          userBadgeRow().style.display = 'flex';
+          document.getElementById('userBadge').textContent = user.displayName || user.email || 'Signed in';
+
+          if (!resolved) {
+            resolved = true;
+            resolve();
+          } else {
+            // A later sign-in after a sign-out: reload data for the new user.
+            await bootApp();
+          }
+        } else {
+          loginScreen().style.display = 'flex';
+          appBody().style.display = 'none';
+          userBadgeRow().style.display = 'none';
+          statusEl().textContent = 'signed out';
+          statusEl().className = 'sync-status local';
+        }
+      });
+    });
+  } catch (err) {
+    console.error('Firebase init failed, falling back to localStorage:', err);
+    useLocalFallback('firestore unavailable — using local storage');
+  }
 }
 
 /* ============================================================
@@ -547,10 +600,7 @@ function openModal(title, fields, onSubmit) {
    INIT
    ============================================================ */
 
-async function init() {
-  setupTabs();
-  await initStore();
-
+async function bootApp() {
   plan = await store.getPlan();
   if (!plan) {
     plan = JSON.parse(JSON.stringify(DEFAULT_PLAN));
@@ -561,8 +611,14 @@ async function init() {
   await renderDashboard();
   renderWorkouts();
   renderSchedule();
-  await renderChecklist(todayStr());
+  await renderChecklist(checklistDateInput.value || todayStr());
   await renderProgress();
 }
 
-init();
+async function main() {
+  setupTabs();
+  await initStore();   // resolves once a store (local, or signed-in firestore) is ready
+  await bootApp();
+}
+
+main();
