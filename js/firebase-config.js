@@ -10,12 +10,12 @@
 // ------------------------------------------------------------------
 
 export const firebaseConfig = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME.appspot.com",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME"
+  apiKey: "AIzaSyCaQphkoKlUqR2ruOAOLJ1N93mV_Og8Ztc",
+  authDomain: "fit-tracker-d0804.firebaseapp.com",
+  projectId: "fit-tracker-d0804",
+  storageBucket: "fit-tracker-d0804.firebasestorage.app",
+  messagingSenderId: "662990449040",
+  appId: "1:662990449040:web:e4f3da525f954612a06b15"
 };
 
-export const isConfigured = firebaseConfig.apiKey !== "REPLACE_ME";
+export const isConfigured = firebaseConfig.apiKey !== "AIzaSyCaQphkoKlUqR2ruOAOLJ1N93mV_Og8Ztc";
