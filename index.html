@@ -52,6 +52,14 @@
     <button class="btn btn-sm btn-primary" id="yesterdayBannerBtn">Add it now</button>
   </div>
 
+  <div class="banner" id="weeklyWeightBanner" style="display:none;">
+    <div>
+      <strong>Weekly weigh-in</strong>
+      <p class="muted small" id="weeklyWeightBannerText"></p>
+    </div>
+    <button class="btn btn-sm btn-primary" id="weeklyWeightBannerBtn">Log weight</button>
+  </div>
+
   <main class="views" id="views">
 
     <!-- ===================== DASHBOARD ===================== -->
@@ -188,7 +196,8 @@
           <h3>Today</h3>
         </div>
         <div id="todayWorkoutBlock"></div>
-        <button class="btn btn-primary btn-block" id="logWorkoutBtn">Mark today's workout complete</button>
+        <button class="btn btn-primary btn-block" id="logWorkoutBtn">Log actual workout</button>
+        <div id="todayComparison" class="compare-block"></div>
       </div>
 
       <div class="card">
@@ -211,6 +220,7 @@
 
       <div class="panel-head">
         <h3>History</h3>
+        <span class="muted small">Tap an entry for plan vs. actual</span>
       </div>
       <div id="workoutHistory" class="timeline"></div>
     </section>
@@ -224,12 +234,16 @@
       <div class="card glass health-score-card">
         <div class="card-head"><h3>Health score</h3></div>
         <div class="score-row">
-          <div class="score-ring-wrap">
-            <svg viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r="50" class="ring-track"/>
-              <circle cx="60" cy="60" r="50" class="ring-fill" id="healthScoreRing" stroke="#21C7A8"/>
+          <div class="score-ring-wrap triple">
+            <svg viewBox="0 0 160 160">
+              <circle cx="80" cy="80" r="70" class="ring-track"/>
+              <circle cx="80" cy="80" r="70" class="ring-fill" id="ringWorkout" stroke="#2DD4A7"/>
+              <circle cx="80" cy="80" r="52" class="ring-track"/>
+              <circle cx="80" cy="80" r="52" class="ring-fill" id="ringSteps" stroke="#FF6584"/>
+              <circle cx="80" cy="80" r="34" class="ring-track"/>
+              <circle cx="80" cy="80" r="34" class="ring-fill" id="ringSleep" stroke="#4C8CFF"/>
             </svg>
-            <div class="ring-center"><span class="ring-pct" id="healthScoreVal">0</span></div>
+            <div class="ring-center"><span class="ring-pct" id="healthScoreVal">0</span><span class="muted small">score</span></div>
           </div>
           <div class="score-breakdown" id="scoreBreakdown"></div>
         </div>
@@ -279,13 +293,29 @@
       </div>
 
       <div class="card">
-        <div class="card-head"><h3>Body profile</h3></div>
+        <div class="card-head"><h3>Personal info</h3></div>
+        <div class="form-row">
+          <label>Name</label>
+          <input type="text" id="nameInput">
+        </div>
+        <div class="form-row">
+          <label>Age</label>
+          <input type="number" id="ageInput" min="10" max="100">
+        </div>
+        <div class="form-row">
+          <label>Gender</label>
+          <select id="genderInput">
+            <option value="female">Female</option>
+            <option value="male">Male</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
         <div class="form-row">
           <label>Height (cm)</label>
           <input type="number" id="heightInput" min="100" max="230">
         </div>
-        <p class="muted small">Used to calculate BMI from your weekly weight log (in the Activity tab).</p>
-        <button class="btn btn-primary" id="saveHeightBtn">Save height</button>
+        <p class="muted small">Used to calculate BMI and calories burned per workout. Weight is tracked weekly in the Activity tab.</p>
+        <button class="btn btn-primary" id="saveHeightBtn">Save personal info</button>
       </div>
 
       <div class="card">
