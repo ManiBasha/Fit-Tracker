@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logbook — 142 Day Training Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="masthead">
+    <div class="masthead-left">
+      <span class="eyebrow">Training Log</span>
+      <h1>Jul 26 &rarr; Dec 15</h1>
+    </div>
+    <div class="scoreboard" id="scoreboard">
+      <div class="score-cell">
+        <span class="score-num" id="dayNumber">–</span>
+        <span class="score-label">Day</span>
+      </div>
+      <div class="score-cell">
+        <span class="score-num" id="daysLeft">–</span>
+        <span class="score-label">Left</span>
+      </div>
+      <div class="score-cell phase-cell">
+        <span class="score-num" id="phaseNumber">–</span>
+        <span class="score-label" id="phaseLabel">Phase</span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="dashboard">01 · Dashboard</button>
+    <button class="tab-btn" data-tab="workouts">02 · Workouts</button>
+    <button class="tab-btn" data-tab="schedule">03 · Schedule</button>
+    <button class="tab-btn" data-tab="checklist">04 · Checklist</button>
+    <button class="tab-btn" data-tab="progress">05 · Progress</button>
+  </nav>
+
+  <main id="main">
+
+    <section class="panel active" id="panel-dashboard">
+      <div class="card index-card">
+        <div class="punch-row"><span></span><span></span><span></span></div>
+        <h2 id="dashPhaseTitle">Loading…</h2>
+        <p class="muted" id="dashPhaseGoal"></p>
+        <div class="today-block">
+          <h3>Today's Session</h3>
+          <div id="todayWorkout" class="today-workout"></div>
+        </div>
+        <div class="today-block">
+          <h3>Checklist Status</h3>
+          <div id="dashChecklistSummary" class="checklist-summary"></div>
+        </div>
+      </div>
+      <div class="card index-card">
+        <div class="punch-row"><span></span><span></span><span></span></div>
+        <h3>Priority Order</h3>
+        <ol class="priority-list">
+          <li>Nutrition &amp; calorie control</li>
+          <li>Strength training</li>
+          <li>Daily movement / walking</li>
+          <li>Sleep</li>
+          <li>Hydration</li>
+          <li>Skincare / grooming</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-workouts">
+      <div class="panel-head">
+        <h2>Workout Templates</h2>
+        <button class="btn btn-primary" id="addWorkoutBtn">+ New Workout</button>
+      </div>
+      <div id="workoutList" class="workout-list"></div>
+    </section>
+
+    <section class="panel" id="panel-schedule">
+      <div class="panel-head">
+        <h2>Weekly Schedule</h2>
+        <span class="muted small">Assign a workout, walk, or rest to each day. Editable anytime.</span>
+      </div>
+      <div id="scheduleGrid" class="schedule-grid"></div>
+    </section>
+
+    <section class="panel" id="panel-checklist">
+      <div class="panel-head">
+        <h2>Daily Checklist</h2>
+        <input type="date" id="checklistDate" class="date-input">
+      </div>
+      <div id="checklistItems" class="checklist-items"></div>
+    </section>
+
+    <section class="panel" id="panel-progress">
+      <div class="panel-head">
+        <h2>Progress Log</h2>
+        <button class="btn btn-primary" id="addProgressBtn">+ Log Entry</button>
+      </div>
+      <div class="card">
+        <canvas id="progressChart" height="140"></canvas>
+      </div>
+      <div id="progressTable" class="progress-table"></div>
+    </section>
+
+  </main>
+
+  <div id="modalRoot"></div>
+
+  <footer class="statusbar">
+    <span id="syncStatus" class="sync-status">connecting…</span>
+  </footer>
+
+</div>
+
+<script type="module" src="js/firebase-config.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
