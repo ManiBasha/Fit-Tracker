@@ -118,7 +118,7 @@ html[data-theme="dark"] .banner{background:linear-gradient(120deg,#3A2A1E,#33241
   stroke-dasharray:515.2;stroke-dashoffset:515.2;
   transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1);
 }
-#healthScoreRing{stroke-dasharray:314;stroke-dashoffset:314;stroke-width:10;transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1);}
+#ringWorkout,#ringSteps,#ringSleep{stroke-width:10;transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1);}
 .ring-center{
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   display:flex;flex-direction:column;align-items:center;
@@ -230,9 +230,13 @@ html[data-theme="dark"] .banner{background:linear-gradient(120deg,#3A2A1E,#33241
 .score-row{display:flex;align-items:center;gap:20px;}
 .score-ring-wrap{position:relative;width:120px;height:120px;flex-shrink:0;}
 .score-ring-wrap svg{width:120px;height:120px;transform:rotate(-90deg);}
+.score-ring-wrap.triple{width:160px;height:160px;}
+.score-ring-wrap.triple svg{width:160px;height:160px;}
+.score-ring-wrap.triple .ring-track{stroke-width:10;}
 .score-breakdown{flex:1;display:flex;flex-direction:column;gap:8px;}
-.score-item{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-muted);}
-.score-item strong{color:var(--text);}
+.score-item{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-muted);}
+.score-item strong{color:var(--text);margin-left:auto;}
+.score-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
 
 .phase-timeline{display:flex;flex-direction:column;gap:0;}
 .phase-item{display:flex;gap:12px;padding:10px 0;}
@@ -282,6 +286,32 @@ html[data-theme="dark"] .badge.earned{background:linear-gradient(160deg,#332B18,
 .simple-table button{background:none;border:none;color:var(--danger);cursor:pointer;}
 
 .sync-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
+
+/* ---------------- Workout comparison ---------------- */
+.compare-block{margin-top:14px;}
+.compare-row{
+  display:grid;grid-template-columns:1fr 70px 70px;gap:8px;align-items:center;
+  padding:8px 0;border-bottom:1px dashed var(--line);font-size:12.5px;
+}
+.compare-row.head{color:var(--text-muted);font-size:10.5px;text-transform:uppercase;font-weight:600;border-bottom:1px solid var(--line);}
+.compare-row .name{font-weight:600;}
+.compare-row .hit{color:var(--mint);font-weight:700;}
+.compare-row .miss{color:var(--coral);font-weight:700;}
+.compare-summary{display:flex;gap:14px;margin-bottom:10px;flex-wrap:wrap;}
+
+.timeline-item.clickable{cursor:pointer;}
+
+/* ---------------- Workout log modal ---------------- */
+.wlog-row{
+  display:grid;grid-template-columns:1fr 60px 60px;gap:8px;align-items:center;padding:6px 0;
+}
+.wlog-row .wlog-name{font-size:13px;}
+.wlog-row .wlog-plan{font-size:10.5px;color:var(--text-muted);display:block;}
+.wlog-row input{
+  width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:8px;
+  background:var(--surface-2);color:var(--text);font-size:13px;text-align:center;
+}
+.wlog-cols-head{display:grid;grid-template-columns:1fr 60px 60px;gap:8px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;margin:14px 0 4px;}
 
 /* ---------------- Login ---------------- */
 .login-screen{
