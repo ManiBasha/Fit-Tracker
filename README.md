@@ -6,6 +6,16 @@ framework, no bundler. Runs on `localStorage` out of the box; add your
 Firebase keys and it gates behind **Sign in with Google** and syncs
 everything to Firestore under that user's own account.
 
+## What's new since the last version
+
+- Real actual-workout tracking (not just templates) with plan-vs-actual comparison
+- Onboarding on first Google sign-in (name, age, gender, weight, height)
+- Every log now lets you pick the date, not just "today"
+- Sleep is now start-time/end-time based, not a manual hours field
+- Calories burned are computed from actual logged workouts
+- Weekly weigh-in reminder banner
+- Apple-Health-style triple activity rings (Workout / Steps / Sleep)
+
 ## Screens
 
 - **Dashboard** — greeting, big step count with an animated watch-face-style
@@ -126,11 +136,13 @@ future change is just edit → commit → push.
 users/{uid}/data/plan          workout templates + weekly schedule
 users/{uid}/data/goals         step goal, sleep goal
 users/{uid}/data/bodyLog       weight log entries → BMI (with profile.height)
-users/{uid}/data/workoutLog    completed-workout history
+users/{uid}/data/workoutLog    actual logged sessions: date, duration, calories,
+                                 per-exercise {plannedSets/Reps, actualSets/Reps, hit}
 users/{uid}/data/streak        current daily streak counter
-users/{uid}/data/profile       height (cm)
+users/{uid}/data/profile       name, age, gender, height, onboarded flag
 users/{uid}/checklist/{date}   legacy 6-item daily checklist (kept from v1)
-users/{uid}/metrics/{date}     steps, heartRate, sleepHours, calories per day
+users/{uid}/metrics/{date}     steps, heartRate, sleepStart/End, sleepHours,
+                                 (optional CSV-imported wearable calories)
 ```
 
 `firestore.rules` scopes every collection to `request.auth.uid == uid`,
