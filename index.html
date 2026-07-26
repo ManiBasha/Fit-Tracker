@@ -18,21 +18,39 @@
       <span class="eyebrow">Training Log</span>
       <h1>Jul 26 &rarr; Dec 15</h1>
     </div>
-    <div class="scoreboard" id="scoreboard">
-      <div class="score-cell">
-        <span class="score-num" id="dayNumber">–</span>
-        <span class="score-label">Day</span>
+    <div class="header-right">
+      <div class="scoreboard" id="scoreboard">
+        <div class="score-cell">
+          <span class="score-num" id="dayNumber">–</span>
+          <span class="score-label">Day</span>
+        </div>
+        <div class="score-cell">
+          <span class="score-num" id="daysLeft">–</span>
+          <span class="score-label">Left</span>
+        </div>
+        <div class="score-cell phase-cell">
+          <span class="score-num" id="phaseNumber">–</span>
+          <span class="score-label" id="phaseLabel">Phase</span>
+        </div>
       </div>
-      <div class="score-cell">
-        <span class="score-num" id="daysLeft">–</span>
-        <span class="score-label">Left</span>
-      </div>
-      <div class="score-cell phase-cell">
-        <span class="score-num" id="phaseNumber">–</span>
-        <span class="score-label" id="phaseLabel">Phase</span>
+      <div class="user-badge-row" id="userBadgeRow" style="display:none;">
+        <span class="user-badge" id="userBadge"></span>
+        <button class="btn btn-ghost btn-sm" id="signOutBtn">Sign out</button>
       </div>
     </div>
   </header>
+
+  <div class="login-screen" id="loginScreen" style="display:none;">
+    <div class="login-card">
+      <span class="eyebrow">Training Log</span>
+      <h2>Sign in to sync your plan</h2>
+      <p class="muted">Your workouts, schedule, checklist, and progress log are saved to your Google account via Firestore, so they follow you across devices.</p>
+      <button class="btn btn-primary" id="signInBtn">Sign in with Google</button>
+      <p class="muted small" id="loginError"></p>
+    </div>
+  </div>
+
+  <div id="appBody">
 
   <nav class="tabs" id="tabs">
     <button class="tab-btn active" data-tab="dashboard">01 · Dashboard</button>
@@ -110,6 +128,8 @@
   </main>
 
   <div id="modalRoot"></div>
+
+  </div><!-- /appBody -->
 
   <footer class="statusbar">
     <span id="syncStatus" class="sync-status">connecting…</span>
