@@ -1,18 +1,70 @@
-# Training Log — 142 Day Tracker
+# Pulse — Training & Health Tracker
 
-A single-page, no-build app for your Jul 26 → Dec 15 transformation plan:
-editable workout templates, an editable weekly schedule, a daily checklist,
-and a progress log with a weight trend chart.
+A single-page, no-build health/training app for your Jul 26 → Dec 15 plan.
+Plain HTML/CSS/JS + [Chart.js](https://www.chartjs.org/) via CDN — no
+framework, no bundler. Runs on `localStorage` out of the box; add your
+Firebase keys and it gates behind **Sign in with Google** and syncs
+everything to Firestore under that user's own account.
 
-Without a Firestore config, it just runs on `localStorage`. Once you add
-your Firebase keys, it gates the app behind **Sign in with Google** and
-syncs every edit to Firestore under that user's own `uid` — wired manually
-with plain `<script type="module">` and the Firebase CDN, no build tooling,
-no framework.
+## Screens
+
+- **Dashboard** — greeting, big step count with an animated watch-face-style
+  progress ring, heart rate / calories / sleep mini cards, this week's step
+  chart, recent workouts, "Start today's workout" button, and a banner if
+  yesterday wasn't logged.
+- **Activity** — steps (week/month toggle), heart rate trend, sleep
+  analysis, calories burned, body log with **weight + height → BMI**
+  auto-calculated, and the wearable sync card.
+- **Workouts** — today's assigned session with a one-tap "mark complete"
+  (feeds the streak and history), goal-vs-actual for the week, fully
+  editable workout templates and weekly schedule, and a full history
+  timeline.
+- **Insights** — a blended health score ring (steps + sleep + workout
+  consistency), the 4-phase program timeline, achievement badges, and a
+  30-day steps chart.
+- **Profile** — step/sleep goals, height (for BMI), light/dark/auto theme,
+  sign out.
+
+Dark mode is adaptive by default (`auto` follows OS preference) with a
+manual light/dark override, both in the header toggle and Profile.
+
+## Wearable sync — what's real vs. what's manual
+
+Being upfront about this, since it shapes how the "sync" card works:
+
+- **Huawei Health Kit** does have a genuine REST API (`health-api.cloud.huawei.com`)
+  for steps, heart rate, sleep, etc., but it requires a Huawei Developer
+  Console app approval and an OAuth2 flow with a **client secret** — that
+  has to live on a server, not in this static site. A small Firebase Cloud
+  Function could hold that secret if you want to build real auto-sync later.
+- **Apple HealthKit has no public web API at all.** It's an on-device iOS
+  framework. The only ways to get that data onto the web are a native
+  companion app, an iOS Shortcuts automation, or a paid aggregator
+  (Terra, Spike, Validic) that reads HealthKit on-device and forwards it.
+
+So today, the **Wearable sync** card on the Activity tab gives you two
+working options instead of a fake "Connect" button:
+
+1. **Quick-log** — type in what your Watch 4 / Huawei Health / Apple Health
+   app shows for steps, heart rate, sleep, and calories. Takes a few
+   seconds, works right now, no backend needed.
+2. **CSV import** — bulk-import a CSV (see format below) if you've
+   exported a range of days from Huawei Health or via an Apple Health
+   export shortcut.
+
+CSV format (header row required, only `date` is mandatory):
+```csv
+date,steps,heartRate,sleepHours,calories
+2026-07-26,8462,68,7.5,2340
+2026-07-27,9120,71,6.8,2510
+```
+
+If you want to pursue real automatic sync later, the cleanest path is a
+Firebase Cloud Function that does the Huawei OAuth token exchange
+server-side and writes into the same `metrics/{date}` documents this app
+already reads — the front end wouldn't need to change.
 
 ## 1. Run it locally
-
-No build step. Just open `index.html` in a browser, or serve the folder:
 
 ```bash
 npx serve .
@@ -20,94 +72,77 @@ npx serve .
 python3 -m http.server 8000
 ```
 
-It works immediately using `localStorage` — nothing else required.
+Works immediately on `localStorage` — nothing else required.
 
-## 2. Connect Firestore + Google Sign-In (manual setup)
+## 2. Connect Firestore + Google Sign-In
 
-1. Go to the [Firebase Console](https://console.firebase.google.com), create
-   a project (or reuse one).
-2. **Build → Firestore Database → Create database** — start in production
-   mode, pick a region.
-3. **Build → Authentication → Sign-in method → Add new provider → Google**
-   — enable it, set a support email, Save.
-4. **Authentication → Settings → Authorized domains** — add the domain(s)
-   you'll serve the app from, e.g. `<your-username>.github.io`
-   (`localhost` is already included by default, for local testing).
-5. **Project settings → General → Your apps → Add app → Web (`</>`)**.
-   Register the app (no Hosting needed), then copy the `firebaseConfig`
-   object it gives you.
+1. [Firebase Console](https://console.firebase.google.com) → create a
+   project (or reuse one).
+2. **Build → Firestore Database → Create database** — production mode,
+   pick a region.
+3. **Build → Authentication → Sign-in method → Add provider → Google** —
+   enable it, set a support email.
+4. **Authentication → Settings → Authorized domains** — add
+   `<your-username>.github.io` (or your custom domain). `localhost` is
+   included by default.
+5. **Project settings → General → Your apps → Add app → Web (`</>`)** —
+   register, copy the `firebaseConfig` object.
 6. Paste those values into `js/firebase-config.js`, replacing the
    `REPLACE_ME` placeholders.
-7. Deploy the security rules in `firestore.rules` — easiest via the
-   Firestore Console → **Rules** tab (paste the file contents and Publish),
-   or with the CLI:
+7. Deploy `firestore.rules` — paste into Firestore Console → **Rules** →
+   Publish, or via CLI:
    ```bash
    npm install -g firebase-tools
    firebase login
-   firebase init firestore   # point it at this repo, keep existing rules file
+   firebase init firestore   # point at this repo, keep the existing rules file
    firebase deploy --only firestore:rules
    ```
 
-Once `firebaseConfig` is filled in, reload the app — you'll land on a
-**"Sign in with Google"** screen instead of the dashboard. After signing in,
-the status line at the bottom switches to *"synced — firestore
-(you@example.com)"*, and every edit (workouts, schedule, checklist,
-progress) writes straight to Firestore under your account's `uid`. Sign out
-via the button next to your name in the header at any point.
-
-If Firestore/Auth ever fails to init (bad config, offline, popup blocked),
-the app automatically falls back to `localStorage` so it keeps working —
-just without the sign-in gate or cross-device sync.
-
-### A note on the Google sign-in popup
-
-`signInWithPopup` requires the page to be served over `http://localhost`
-or `https://` (which GitHub Pages provides automatically) — opening
-`index.html` directly as a `file://` URL will not work for Google sign-in
-(though the app still runs fine on `localStorage` in that case). Use
-`npx serve .` or similar for local testing once Google auth is wired in.
+Reload the app — you'll land on **Sign in with Google** instead of the
+dashboard. After signing in, Profile → sync status shows
+`synced — firestore (you@example.com)`, and every edit writes straight to
+Firestore under your `uid`. `signInWithPopup` needs `http://localhost` or
+`https://` — it won't work opening `index.html` as a `file://` path.
 
 ## 3. Host on GitHub Pages
 
-1. Push this folder to a new GitHub repo:
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial training log app"
-   git branch -M main
-   git remote add origin https://github.com/<your-username>/<repo-name>.git
-   git push -u origin main
-   ```
-2. On GitHub: **Settings → Pages → Build and deployment → Source: Deploy
-   from a branch → Branch: `main` / root**.
-3. Your app will be live at
-   `https://<your-username>.github.io/<repo-name>/` within a minute or two.
+```bash
+git init
+git add .
+git commit -m "Pulse tracker"
+git branch -M main
+git remote add origin https://github.com/<your-username>/<repo-name>.git
+git push -u origin main
+```
 
-Because it's static files with no build step, every future edit is just:
-edit → commit → push → Pages redeploys automatically.
+Then **Settings → Pages → Build and deployment → Source: Deploy from a
+branch → `main` / root**. Live at
+`https://<your-username>.github.io/<repo-name>/` shortly after. Every
+future change is just edit → commit → push.
 
-## What's editable
+## Data model (Firestore)
 
-- **Workouts** — rename any workout, add/remove exercises, edit sets/reps
-  inline. Add entirely new workout templates (e.g. a Workout C once you have
-  dumbbells).
-- **Schedule** — each day of the week maps to Rest / Walk / any workout
-  template, via dropdown. Changing a workout's name updates it everywhere.
-- **Checklist** — the six daily habits from the plan, toggleable per date
-  (use the date picker to fill in a missed day or check tomorrow's plan).
-- **Progress** — log date, weight, waist, chest, arm, thigh, and notes.
-  The chart plots weight over time automatically once you have 2+ entries.
+```
+users/{uid}/data/plan          workout templates + weekly schedule
+users/{uid}/data/goals         step goal, sleep goal
+users/{uid}/data/bodyLog       weight log entries → BMI (with profile.height)
+users/{uid}/data/workoutLog    completed-workout history
+users/{uid}/data/streak        current daily streak counter
+users/{uid}/data/profile       height (cm)
+users/{uid}/checklist/{date}   legacy 6-item daily checklist (kept from v1)
+users/{uid}/metrics/{date}     steps, heartRate, sleepHours, calories per day
+```
+
+`firestore.rules` scopes every collection to `request.auth.uid == uid`,
+so it works identically whether you're signed in via Google or (if you
+ever revert to it) anonymous auth.
 
 ## File structure
 
 ```
-index.html            page shell, tab navigation, login screen
-css/style.css          all styling (design tokens at the top)
+index.html            app shell: login screen, 5 views, bottom nav
+css/style.css          design tokens, glassmorphism, light/dark themes
 js/firebase-config.js  YOUR Firestore project keys go here
-js/app.js               app logic: auth, store abstraction, rendering, CRUD
+js/app.js               auth, store, rendering, charts, CRUD for everything
 firestore.rules         security rules — deploy these to Firebase
 ```
-
-Rules stay the same regardless of which auth method you use — they just
-check `request.auth.uid == uid` on each `users/{uid}/...` document, so
-Google-authenticated users are scoped to their own data automatically.
