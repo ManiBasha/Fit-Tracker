@@ -56,8 +56,9 @@ const BADGES = [
    ============================================================ */
 
 let store, plan, goals, currentUser;
-let cache = { checklistToday:{}, metrics:{}, bodyLog:[], workoutLog:[], streak:{streak:0,lastDate:null} };
+let cache = { checklistToday:{}, metrics:{}, bodyLog:[], workoutLog:[], streak:{streak:0,lastDate:null}, myGroupCode:null };
 let charts = {};
+let groupDb = null, groupFns = null; // set once Firestore is available, used by the Soulmate group feature
 
 /* ============================================================
    DATE HELPERS
@@ -131,7 +132,7 @@ async function initStore(){
   try{
     const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
     const fsMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const { getFirestore, doc, getDoc, setDoc } = fsMod;
+    const { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } = fsMod;
     const { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } =
       await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
 
@@ -152,6 +153,8 @@ async function initStore(){
       onAuthStateChanged(auth, async user => {
         if(user){
           store = buildFirestoreStore(db, {doc,getDoc,setDoc}, user.uid);
+          groupDb = db;
+          groupFns = { doc, collection, getDocs, setDoc, deleteDoc };
           currentUser = user;
           statusEl().textContent = 'synced — firestore (' + (user.email||'google account') + ')';
           loginScreen().style.display = 'none';
@@ -213,6 +216,7 @@ function setupNav(){
     document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === viewName));
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + viewName));
     window.scrollTo({top:0, behavior:'instant'});
+    if(viewName === 'soulmate') renderSoulmate();
   }
   document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => go(btn.dataset.view)));
   document.querySelectorAll('[data-nav]').forEach(btn => btn.addEventListener('click', () => go(btn.dataset.nav)));
@@ -233,6 +237,7 @@ async function loadAll(){
   cache.workoutLog = (await store.getData('workoutLog'))?.entries || [];
   cache.streak = await store.getData('streak') || { streak:0, lastDate:null };
   cache.profile = await store.getData('profile') || { name:'', age:null, gender:'female', height:null, onboarded:false };
+  cache.myGroupCode = (await store.getData('soulmateGroup'))?.code || null;
 
   cache.checklistToday = await store.getChecklist(todayStr()) || {};
   cache.metricsToday = await store.getMetrics(todayStr()) || {};
@@ -528,6 +533,7 @@ function openQuickLogModal(dateStr){
     renderYesterdayBanner();
     renderDashboard();
     renderActivity();
+    if(cache.myGroupCode) syncMyGroupStats();
   });
 }
 
@@ -713,6 +719,7 @@ function openWorkoutLogModal(dateStr){
     renderGoalVsActual();
     renderInsights();
     renderDashboard();
+    if(cache.myGroupCode) syncMyGroupStats();
     overlay.remove();
   });
   actions.append(cancel, save);
@@ -842,7 +849,7 @@ function showWorkoutDetailModal(entry){
   overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
 }
 
-document.getElementById('startWorkoutBtn').addEventListener('click', () => window._goView('workouts'));
+document.getElementById('startWorkoutBtn').addEventListener('click', () => window._goView('activity'));
 
 /* ============================================================
    STREAK
@@ -862,11 +869,9 @@ async function recomputeStreak(dateStr, isComplete){
    INSIGHTS
    ============================================================ */
 
-function renderInsights(){
-  const dayNum = dayNumber();
-  const phase = currentPhase();
-
-  // health score: blend of steps%, sleep%, workout consistency
+// Blend of steps%, sleep%, and workout consistency — used by Insights and by
+// the Soulmate group sync (so group members can compare the same score).
+function computeHealthScoreData(){
   const dates = last7Dates();
   const avgStepsPct = dates.reduce((sum,d)=>sum + Math.min(1,(cache.metricsWeek[d]?.steps||0)/goals.steps), 0) / 7;
   const avgSleepPct = dates.reduce((sum,d)=>sum + Math.min(1,(cache.metricsWeek[d]?.sleepHours||0)/goals.sleep), 0) / 7;
@@ -874,6 +879,14 @@ function renderInsights(){
   const plannedThisWeek = Object.values(plan.schedule).filter(v=>v!=='rest'&&v!=='walk').length || 1;
   const workoutPct = Math.min(1, workoutsThisWeek/plannedThisWeek);
   const score = Math.round((avgStepsPct*0.4 + avgSleepPct*0.3 + workoutPct*0.3) * 100);
+  return { score, avgStepsPct, avgSleepPct, workoutPct, workoutsThisWeek, plannedThisWeek };
+}
+
+function renderInsights(){
+  const dayNum = dayNumber();
+  const phase = currentPhase();
+
+  const { score, avgStepsPct, avgSleepPct, workoutPct, workoutsThisWeek, plannedThisWeek } = computeHealthScoreData();
 
   setRing(document.getElementById('ringWorkout'), workoutPct, 70);
   setRing(document.getElementById('ringSteps'), avgStepsPct, 52);
@@ -1031,9 +1044,108 @@ function openModal(title, fields, onSubmit){
 document.querySelectorAll('[data-open]').forEach(card => {
   card.addEventListener('click', () => {
     const metric = card.dataset.open.split('-')[1];
-    if(metric === 'calories'){ window._goView('workouts'); }
+    if(metric === 'calories'){ window._goView('activity'); }
     else openQuickLogModal(todayStr());
   });
+});
+
+/* ============================================================
+   SOULMATE — join a group via a shared code, see members' stats.
+   Requires Google sign-in + Firestore (cross-account by definition,
+   so it can't work on the localStorage-only fallback).
+   ============================================================ */
+
+async function syncMyGroupStats(){
+  if(!groupDb || !cache.myGroupCode || !currentUser?.uid) return;
+  const { doc, setDoc } = groupFns;
+  const hs = computeHealthScoreData();
+  const steps = Number(cache.metricsToday?.steps || 0);
+  const ref = doc(groupDb, 'groups', cache.myGroupCode, 'members', currentUser.uid);
+  await setDoc(ref, {
+    name: cache.profile?.name || currentUser.displayName || 'Member',
+    steps,
+    healthScore: hs.score,
+    streak: cache.streak?.streak || 0,
+    workoutsThisWeek: hs.workoutsThisWeek,
+    updatedAt: todayStr()
+  });
+}
+
+async function loadGroupMembers(code){
+  if(!groupDb) return [];
+  const { collection, getDocs } = groupFns;
+  const snap = await getDocs(collection(groupDb, 'groups', code, 'members'));
+  const list = [];
+  snap.forEach(d => list.push({ uid: d.id, ...d.data() }));
+  return list;
+}
+
+async function renderSoulmate(){
+  const joinCard = document.getElementById('soulmateJoinCard');
+  const activeWrap = document.getElementById('soulmateActiveWrap');
+  const errorEl = document.getElementById('groupError');
+  if(errorEl) errorEl.textContent = '';
+
+  if(store.backend === 'local'){
+    joinCard.style.display = 'block';
+    joinCard.innerHTML = `<div class="card-head"><h3>Join a group</h3></div>
+      <p class="muted small">Soulmate groups need Google sign-in, since they show data shared between accounts. Sign in from Profile to use this tab.</p>`;
+    activeWrap.style.display = 'none';
+    return;
+  }
+
+  if(!cache.myGroupCode){
+    joinCard.style.display = 'block';
+    activeWrap.style.display = 'none';
+    return;
+  }
+
+  joinCard.style.display = 'none';
+  activeWrap.style.display = 'block';
+  document.getElementById('activeGroupCode').textContent = cache.myGroupCode;
+
+  await syncMyGroupStats();
+  const members = await loadGroupMembers(cache.myGroupCode);
+  members.sort((a,b) => (b.steps||0) - (a.steps||0));
+
+  const list = document.getElementById('soulmateMembers');
+  list.innerHTML = members.length ? '' : '<p class="timeline-empty">No members yet — you\'re the first one here.</p>';
+  members.forEach(m => {
+    const isMe = m.uid === currentUser?.uid;
+    const card = document.createElement('div');
+    card.className = 'workout-card';
+    card.innerHTML = `
+      <div class="workout-card-head">
+        <span style="font-family:var(--font-display);font-weight:700;font-size:15px;">${escapeHtml(m.name||'Member')}${isMe ? ' (you)' : ''}</span>
+        <span class="pill">🔥 ${m.streak||0}d</span>
+      </div>
+      <div class="compare-summary">
+        <div class="bmi-chip"><span class="v">${(m.steps||0).toLocaleString()}</span><span class="l">Steps today</span></div>
+        <div class="bmi-chip"><span class="v">${m.healthScore||0}</span><span class="l">Health score</span></div>
+        <div class="bmi-chip"><span class="v">${m.workoutsThisWeek||0}</span><span class="l">Workouts/wk</span></div>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+document.getElementById('joinGroupBtn').addEventListener('click', async () => {
+  const errorEl = document.getElementById('groupError');
+  const raw = document.getElementById('groupCodeInput').value.trim().toUpperCase();
+  if(!raw){ errorEl.textContent = 'Enter a code to join or create a group.'; return; }
+  if(store.backend === 'local'){ errorEl.textContent = 'Sign in with Google first.'; return; }
+  cache.myGroupCode = raw;
+  await store.setData('soulmateGroup', { code: raw });
+  await renderSoulmate();
+});
+
+document.getElementById('leaveGroupBtn').addEventListener('click', async () => {
+  if(!cache.myGroupCode || !groupDb) return;
+  const { doc, deleteDoc } = groupFns;
+  await deleteDoc(doc(groupDb, 'groups', cache.myGroupCode, 'members', currentUser.uid));
+  cache.myGroupCode = null;
+  await store.setData('soulmateGroup', { code: null });
+  document.getElementById('groupCodeInput').value = '';
+  await renderSoulmate();
 });
 
 /* ============================================================
@@ -1062,6 +1174,7 @@ async function bootApp(){
   renderWorkoutHistory();
   renderInsights();
   renderProfile();
+  if(cache.myGroupCode) syncMyGroupStats();
   if(!cache.profile.onboarded) openOnboardingModal();
 }
 
